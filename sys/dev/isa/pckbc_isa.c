@@ -65,56 +65,87 @@ void	pckbc_isa_intr_establish(struct pckbc_softc *, pckbc_slot_t);
 int
 pckbc_isa_match(device_t parent, cfdata_t match, void *aux)
 {
+	printf("= inside pckbc_isa_match\n");
 	struct isa_attach_args *ia = aux;
 	bus_space_tag_t iot = ia->ia_iot;
 	bus_space_handle_t ioh_d, ioh_c;
 	int res, ok = 1;
 
-	if (ISA_DIRECT_CONFIG(ia))
+	/*
+	printf("= attempting to write a byte to the bus...\n");
+	printf("= iot=0x%lx\tioh_c=0x%lx\n",
+	       (long unsigned int) iot,
+	       (long unsigned int) ioh_c);
+	bus_space_write_1(iot, 0x64, 0, 0xFF);
+	printf("= write succeeded!\n");
+	*/
+	if (ISA_DIRECT_CONFIG(ia)){
+		printf("xxx: direct config\n");
 		return (0);
+	}
 
 	/* If values are hardwired to something that they can't be, punt. */
 	if (ia->ia_nio < 1 ||
 	    (ia->ia_io[0].ir_addr != ISA_UNKNOWN_PORT &&
-	     ia->ia_io[0].ir_addr != IO_KBD))
+	     ia->ia_io[0].ir_addr != IO_KBD)) {
+		printf("xxx: values hardwired!\n");
 		return (0);
+	}
 
 	if (ia->ia_niomem > 0 &&
-	    (ia->ia_iomem[0].ir_addr != ISA_UNKNOWN_IOMEM))
+	    (ia->ia_iomem[0].ir_addr != ISA_UNKNOWN_IOMEM)){
+		printf("xxx: ia_niomem > 0 oraz != ISA_UNKNOWN_IOMEM\n");
 		return (0);
+	}
 
 	if (ia->ia_nirq < 1 ||
 	    (ia->ia_irq[0].ir_irq != ISA_UNKNOWN_IRQ &&
-	     ia->ia_irq[0].ir_irq != 1 /*XXX*/))
+	     ia->ia_irq[0].ir_irq != 1 /*XXX*/)) {
+		printf("xxx: dziwne IRQ\n");
 		return (0);
+	}
 
 	if (ia->ia_ndrq > 0 &&
-	    (ia->ia_drq[0].ir_drq != ISA_UNKNOWN_DRQ))
+	    (ia->ia_drq[0].ir_drq != ISA_UNKNOWN_DRQ)){
+		printf("xxx: dziwne DRQ\n");
 		return (0);
-
+	}
+	printf("przed is_console\n");
 	if (pckbc_is_console(iot, IO_KBD) == 0) {
+		printf("iscon: W ifie is_console\n");
 		struct pckbc_internal t;
-
-		if (bus_space_map(iot, IO_KBD + KBDATAP, 1, 0, &ioh_d))
-			return (0);
-		if (bus_space_map(iot, IO_KBD + KBCMDP, 1, 0, &ioh_c)) {
-			bus_space_unmap(iot, ioh_d, 1);
+		
+		if (bus_space_map(iot, IO_KBD + KBDATAP, 1, 0, &ioh_d)){
+			printf("iscon: bus_space_map pierwszy\n");
 			return (0);
 		}
-
+		if (bus_space_map(iot, IO_KBD + KBCMDP, 1, 0, &ioh_c)) {
+			printf("iscon: drugi bus_space_map\n");
+			bus_space_unmap(iot, ioh_d, 1);
+			printf("iscon: po unmap\n");
+			return (0);
+		}
+		printf("iscon: zerowanie %d bajtow pod adresem %p\n", sizeof(t), (void*) &t);
 		memset(&t, 0, sizeof(t));
 		t.t_iot = iot;
 		t.t_ioh_d = ioh_d;
 		t.t_ioh_c = ioh_c;
-
+		printf("iscon: flushowanie klawiatury\n");
 		/* flush KBC */
 		(void) pckbc_poll_data1(&t, PCKBC_KBD_SLOT);
-
+		printf("iscon: selftest ----- commented out\n");
 		/* KBC selftest */
+
+		/* ERRORS OUT HERE */
+		/*
 		if (pckbc_send_cmd(iot, ioh_c, KBC_SELFTEST) == 0) {
 			ok = 0;
+			printf("iscon: selftest OK ide do out\n");
 			goto out;
 		}
+		
+		*/
+		printf("iscon: polling data...\n");
 		res = pckbc_poll_data1(&t, PCKBC_KBD_SLOT);
 #ifndef PCKBCNOTEST
 		if (res != 0x55) {
@@ -126,37 +157,42 @@ pckbc_isa_match(device_t parent, cfdata_t match, void *aux)
 #else
 		__USE(res);
 #endif /* PCKBCNOTEST */
- out:
+		/* out:*/
+		printf("iscon: after commented out selftest!\n");
 		bus_space_unmap(iot, ioh_d, 1);
 		bus_space_unmap(iot, ioh_c, 1);
 	}
-
+	printf("pckbc-out: ok=%d\n", ok);
 	if (ok) {
+		printf("w if(ok)\n");
 		ia->ia_io[0].ir_addr = IO_KBD;
 		ia->ia_io[0].ir_size = 5;
 		ia->ia_nio = 1;
-
+		
 		ia->ia_niomem = 0;
 		ia->ia_nirq = 0;
 		ia->ia_ndrq = 0;
 	}
+	printf("pckbc-out: koniec match\n");
 	return (ok);
 }
 
 void
 pckbc_isa_attach(device_t parent, device_t self, void *aux)
 {
+	printf("pcka: entering pckbc_isa_attach\n");
 	struct pckbc_isa_softc *isc = device_private(self);
 	struct pckbc_softc *sc = &isc->sc_pckbc;
 	struct isa_attach_args *ia = aux;
 	struct pckbc_internal *t;
 	bus_space_tag_t iot;
 	bus_space_handle_t ioh_d, ioh_c;
-
+	
+	
 	sc->sc_dv = self;
 	isc->sc_ic = ia->ia_ic;
 	iot = ia->ia_iot;
-
+	printf("pcka: after struct defs, pre switch. ia->ia_nirq=%d\n", ia->ia_nirq);
 	switch (ia->ia_nirq) {
 	case 1:
 		/* Both channels use the same IRQ. */
@@ -176,20 +212,25 @@ pckbc_isa_attach(device_t parent, device_t self, void *aux)
 		isc->sc_irq[PCKBC_AUX_SLOT] = 12;
 		break;
 	}
-
+	printf("pcka: after switch\n");
+	
 	sc->intr_establish = pckbc_isa_intr_establish;
 
 	if (pckbc_is_console(iot, IO_KBD)) {
+		printf("pcka: is a console.\n");
 		t = &pckbc_consdata;
 		ioh_d = t->t_ioh_d;
 		ioh_c = t->t_ioh_c;
 		pckbc_console_attached = 1;
 		/* t->t_cmdbyte was initialized by cnattach */
 	} else {
+		printf("pcka: is NOT a console\n");
+		printf("pcka: attepmring bus space map\n");
 		if (bus_space_map(iot, IO_KBD + KBDATAP, 1, 0, &ioh_d) ||
 		    bus_space_map(iot, IO_KBD + KBCMDP, 1, 0, &ioh_c))
 			panic("pckbc_attach: couldn't map");
 
+		printf("pcka: before some vars and callout init\n");
 		t = malloc(sizeof(struct pckbc_internal), M_DEVBUF,
 		    M_WAITOK|M_ZERO);
 		t->t_iot = iot;
@@ -199,17 +240,18 @@ pckbc_isa_attach(device_t parent, device_t self, void *aux)
 		t->t_cmdbyte = KC8_CPU; /* Enable ports */
 		callout_init(&t->t_cleanup, 0);
 	}
-
+	printf("pcka: after is_console() if...\n");
 	t->t_sc = sc;
 	sc->id = t;
 
 	aprint_normal("\n");
-
+	printf("pcka: attempting to establish power handler!\n");
 	if (!pmf_device_register(self, NULL, pckbc_resume))
 		aprint_error_dev(self, "couldn't establish power handler\n");
-
+	printf("\npcka: ===== attepmpting to pckbc_attach! =====\n\n");
 	/* Finish off the attach. */
 	pckbc_attach(sc);
+	printf("\npcka: ===== pckbc_attach over! =====\n\n");
 }
 
 void

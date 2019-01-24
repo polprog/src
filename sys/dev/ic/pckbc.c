@@ -100,21 +100,91 @@ static inline int
 pckbc_wait_output(bus_space_tag_t iot, bus_space_handle_t ioh_c)
 {
 	u_int i;
-
+	printf(">>>>...wait_output: entering function...");
 	for (i = 100000; i; i--)
 		if (!(bus_space_read_1(iot, ioh_c, 0) & KBS_IBF)) {
 			KBD_DELAY;
+			printf("done, exiting function\n");
 			return (1);
 		}
 	return (0);
 }
 
+
+/* void */
+/* a20test(void); */
+
+/* void a20test(void){ */
+/* 	//	volatile u_char result = 2; */
+/* 	//TODO: write this */
+	
+/* } */
+
+
+
 int
 pckbc_send_cmd(bus_space_tag_t iot, bus_space_handle_t ioh_c, u_char val)
 {
-	if (!pckbc_wait_output(iot, ioh_c))
+	//printf(">>>...send_cmd: testing for current priv lvl...");
+	/*volatile u_char cpl;
+	volatile unsigned int eflags;
+	asm volatile("\
+movw %%cs, %%ax        \n\t\
+andw $3, %%ax          \n\t\
+movw %%ax, %[cpl]      \n\t\
+pushf                  \n\t\
+popl %%eax             \n\t\
+movl %%eax, %[eflags]   \n\t\
+"::[cpl] "m" (cpl), [eflags] "m" (eflags)  :"eax");
+printf("\n\tcpl=%d eflags=%08xh cpl(eflags)=%d\n", cpl, eflags, ((eflags&(3<<12))>>12) ); */
+	
+	printf(">>>...send_cmd: entering function, iot=0x%lx, ioh=0x%lx, val=0x%x\n",
+	       (unsigned long int) iot, (unsigned long int) ioh_c, val);
+	if (!pckbc_wait_output(iot, ioh_c)){
+		printf(">>>...send_cmd: wait_output failed, exiting\n");
 		return (0);
+	}
+	printf(">>>...send_cmd: attempting to write the value..\n");
+	//printf(">>>...send_cmd: iot=0x%lx\tioh_c=0x%lx\tval=0x%x\n",
+	//       (long unsigned int) iot,
+	//       (long unsigned int) ioh_c,
+	//       val);
+	//printf(">>>...send_cmd: !!! testing asm !!!\n");
+	//bus_space_write_1(iot, ioh_c, 0, val);
+	/*	asm volatile("			\
+mov %[ioh_c], %%edx                  \n\t	\
+movzx %[val], %%eax                    \n\t\
+outb %%al, %%dx                      \n\t		\
+":: [val] "m" (val), [ioh_c] "m" (ioh_c):"eax", "ebx");*/
+	
+	//	printf(">>>...send_cmd: !!! testing D1 and FF writes and others !!!\n");
+	//printf(">>>...send_cmd: writing D1...");
+	//bus_space_write_1(iot, ioh_c, 0, 0xD1);
+	//printf("okay...\n");
+	/*	printf(">>>...send_cmd: writing FF...");
+	bus_space_write_1(iot, ioh_c, 0, 0xFF);
+	printf("okay...\n");
+	printf(">>>...send_cmd: writing 55 [some garbage]...");
+	bus_space_write_1(iot, ioh_c, 0, 0x55);
+	printf("okay...\n");
+	printf(">>>...send_cmd: writing 60 [offending value?]...");
+	bus_space_write_1(iot, ioh_c, 0, 0x60);
+	printf("okay...\n");
+	printf(">>>...send_cmd: writing aa [another offndg val]...");
+	bus_space_write_1(iot, ioh_c, 0, 0xaa);
+	printf("okay...\n");*/
+	printf(">>>...send_cmd: writing the actual value...");
 	bus_space_write_1(iot, ioh_c, 0, val);
+	printf("okay...");
+	printf("writing D1...");
+	bus_space_write_1(iot, ioh_c, 0, 0xD1);
+	printf("okay...\n");
+	
+	for(int i = 0; i < 10000; i++);
+	printf(">>>...send_cmd: ok, exiting function\n");
+	//printf(">>>...send_cmd: actually not, inf looping here so you can read this");
+	//for(;;);
+	
 	return (1);
 }
 
@@ -199,15 +269,23 @@ pckbc_get8042cmd(struct pckbc_internal *t)
 static int
 pckbc_put8042cmd(struct pckbc_internal *t)
 {
+	printf(">>...put8042cmd: entering function\n");
 	bus_space_tag_t iot = t->t_iot;
 	bus_space_handle_t ioh_d = t->t_ioh_d;
 	bus_space_handle_t ioh_c = t->t_ioh_c;
-
-	if (!pckbc_send_cmd(iot, ioh_c, K_LDCMDBYTE))
+	printf(">>...put8042cmd: sending K_LDCMDBYTE = %d = %02xh..\n", K_LDCMDBYTE, K_LDCMDBYTE);
+	if (!pckbc_send_cmd(iot, ioh_c, K_LDCMDBYTE)){
+		printf("--send failed, exiting\n");
 		return (0);
-	if (!pckbc_wait_output(iot, ioh_c))
+        }
+	printf(">>...put8042cmd: ok, wait for output..\n");
+	if (!pckbc_wait_output(iot, ioh_c)){
+		printf("--wait failed, exiting\n");
 		return (0);
+	}
+	printf(">>...put8042cmd: ok, sending cmdbyte..\n");
 	bus_space_write_1(iot, ioh_d, 0, t->t_cmdbyte);
+	printf(">>...put8042cmd: sent, exiting function\n");
 	return (1);
 }
 
@@ -273,9 +351,33 @@ pckbc_attach_slot(struct pckbc_softc *sc, pckbc_slot_t slot)
 	return child != NULL;
 }
 
+
+
+
+
+
+void dump_pckbc_internal(struct pckbc_internal *);
+
+void
+dump_pckbc_internal(struct pckbc_internal *pi){
+	printf("@ data port=0x%lx\tcmd port=0x%lx\n", (unsigned long int) pi->t_ioh_d,
+	       (unsigned long int) pi->t_ioh_c);
+	printf("@   cmdbyte=0x%x\t   flags=0x%x\n", pi->t_cmdbyte, pi->t_flags);
+	printf("@ receive buffer -> rbuf:data@slot =");
+	for(int i = 0; i < PCKBC_RBUF_SIZE; i++){
+		if(i%8==0) printf("\n %xh:   ", i);
+		printf("%xh@%xh ", pi->rbuf[i].data, pi->rbuf[i].slot);
+	}
+	printf("\n@ rbuf_read=%x\trbuf_write=%x\n", pi->rbuf_read, pi->rbuf_write);
+}
+
+
 void
 pckbc_attach(struct pckbc_softc *sc)
 {
+	//printf(">pckbc_attach: entering attach()\n");
+	//printf(">pckbc_attach: sc at %p\n", (void *) &sc);
+	//printf(">pckbc_attach: \n");
 	struct pckbc_internal *t;
 	bus_space_tag_t iot;
 	bus_space_handle_t ioh_d, ioh_c;
@@ -286,16 +388,26 @@ pckbc_attach(struct pckbc_softc *sc)
 	iot = t->t_iot;
 	ioh_d = t->t_ioh_d;
 	ioh_c = t->t_ioh_c;
-
+	
+	//dump_pckbc_internal(t);
+	
+	//printf(">pckbc_attach: ioh_d=%lx\tioh_c=%lx\n", (long unsigned int) ioh_d,
+	//       (long unsigned int) ioh_c);
+	//printf(">pckbc_attach: has aux? t_haveaux=%x\n", t->t_haveaux);
+	//printf(">pckbc_attach: \n");
+	//printf(">pckbc_attach: attempting to attach to port.. pckbport_attach()\n");
 	t->t_pt = pckbport_attach(t, &pckbc_ops);
 	if (t->t_pt == NULL) {
 		aprint_error(": attach failed\n");
 		return;
 	}
-
+	//printf(">pckbc_attach: attach OK ... attempting to flush\n");
+	
 	/* flush */
 	(void) pckbc_poll_data1(t, PCKBC_KBD_SLOT);
-
+	//printf(">pckbc_attach: polled data\n");
+	//dump_pckbc_internal(t);
+	//printf(">pckbc_attach: setting initial cmd byte\n");
 	/* set initial cmd byte */
 	if (!pckbc_put8042cmd(t)) {
 		aprint_error("pckbc: cmd word write error\n");
@@ -334,6 +446,8 @@ pckbc_attach(struct pckbc_softc *sc)
 		cmdbits |= KC8_KENABLE;
 #endif /* 0 */
 
+
+	printf(">pckbc_attach: attempting to send KBC_AUXECHO command\n");
 	/*
 	 * Check aux port ok.
 	 * Avoid KBC_AUXTEST because it hangs some older controllers
@@ -347,23 +461,32 @@ pckbc_attach(struct pckbc_softc *sc)
 		aprint_error("pckbc: aux echo error 2\n");
 		goto nomouse;
 	}
+	printf(">pckbc_attach: we have aux\n");
 	t->t_haveaux = 1;
+	printf(">pckbc_attach: writing a random value of 0x5a ...\n");
 	bus_space_write_1(iot, ioh_d, 0, 0x5a); /* a random value */
+	printf(">pckbc_attach: reading response ...\n");
 	res = pckbc_poll_data1(t, PCKBC_AUX_SLOT);
-
+	printf(">pckbc_attach: res=%d\t=%x\n", res, res);
+	
 	/*
 	 * The following is needed to find the aux port on the Tadpole
 	 * SPARCle.
 	 */
 	if (res == -1 && ISSET(t->t_flags, PCKBC_NEED_AUXWRITE)) {
 		/* Read of aux echo timed out, try again */
+		printf(">pckbc_attach: timeout (inside sparcle if clause\n");
 		if (!pckbc_send_cmd(iot, ioh_c, KBC_AUXWRITE))
 			goto nomouse;
 		if (!pckbc_wait_output(iot, ioh_c))
 			goto nomouse;
+		printf(">pckbc_attach: trying to write 0x5a again ...");
 		bus_space_write_1(iot, ioh_d, 0, 0x5a);
+		printf("done, polling data\n");
 		res = pckbc_poll_data1(t, PCKBC_AUX_SLOT);
+		printf(">pckbc_attach: res= %d = %x\n", res, res);
 	}
+	printf(">pckbc_attach: after sparcle if\n");
 	if (res != -1) {
 		/*
 		 * In most cases, the 0x5a gets echoed.
@@ -372,21 +495,24 @@ pckbc_attach(struct pckbc_softc *sc)
 		 * We are satisfied if there is anything in the
 		 * aux output buffer.
 		 */
+		printf(">pckbc_attach: entering res != -1 if. attempting to attach aux slot\n");
 		if (pckbc_attach_slot(sc, PCKBC_AUX_SLOT))
 			cmdbits |= KC8_MENABLE;
 	} else {
-
+		
 #ifdef PCKBCDEBUG
 		printf("pckbc: aux echo test failed\n");
 #endif
 		t->t_haveaux = 0;
 	}
-
+	printf(">pckbc_attach: ifs done.\n");
 nomouse:
 	/* enable needed interrupts */
 	t->t_cmdbyte |= cmdbits;
+	printf(">pckbc_attach: enabling needed interrupts, t->t_cmdbyte=%x\n", t->t_cmdbyte);
 	if (!pckbc_put8042cmd(t))
 		aprint_error("pckbc: cmd word write error\n");
+	printf(">pckbc_attach: exiting pckbc_attach()\n");
 }
 
 static void
