@@ -20,7 +20,7 @@ INCS=	a.out.h aio.h ar.h assert.h atomic.h \
 	resolv.h res_update.h rmt.h sched.h search.h semaphore.h setjmp.h \
 	string.h sgtty.h signal.h spawn.h stab.h stdalign.h stddef.h stdio.h \
 	stdlib.h stdnoreturn.h strings.h stringlist.h struct.h sysexits.h \
-	tar.h time.h ttyent.h tzfile.h \
+	tar.h time.h ttyent.h tzfile.h uchar.h \
 	ucontext.h ulimit.h unistd.h util.h utime.h utmp.h utmpx.h uuid.h \
 	vis.h wchar.h wctype.h wordexp.h
 INCS+=	arpa/ftp.h arpa/inet.h arpa/nameser.h arpa/nameser_compat.h \

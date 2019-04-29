@@ -3202,6 +3202,7 @@
 ./usr/include/ttyent.h				comp-c-include
 ./usr/include/tzfile.h				comp-c-include
 ./usr/include/ucontext.h			comp-c-include
+./usr/include/uchar.h				comp-c-include
 ./usr/include/ufs/ext2fs/ext2fs.h		comp-c-include
 ./usr/include/ufs/ext2fs/ext2fs_dinode.h	comp-c-include
 ./usr/include/ufs/ext2fs/ext2fs_dir.h		comp-c-include

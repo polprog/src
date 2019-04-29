@@ -90,6 +90,7 @@ CPPFLAGS+=	-D__BUILD_LEGACY
 .include "${.CURDIR}/termios/Makefile.inc"
 .include "${.CURDIR}/thread-stub/Makefile.inc"
 .include "${.CURDIR}/time/Makefile.inc"
+.include "${.CURDIR}/multibyte/Makefile.inc"
 .if ${RUMPRUN} != "yes"
 .include "${.CURDIR}/tls/Makefile.inc"
 .endif
