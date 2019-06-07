@@ -48,7 +48,6 @@ ATF_TC_HEAD(c16rtomb_single, tc)
 ATF_TC_BODY(c16rtomb_single, tc)
 {
     int rc;
-    mbstate_t st;
     char target[MB_LEN_MAX] = {0x00};
     char expected[sizeof(target)] = {0xE2, 0x9A, 0xA0, 0x00};
     char16_t warning_char = u'\u26A0'; //U+26A0 Warning Sign
@@ -59,8 +58,62 @@ ATF_TC_BODY(c16rtomb_single, tc)
     ATF_REQUIRE(memcmp(target, expected, MB_LEN_MAX) == 0);
 }
 
+ATF_TC(c16rtomb_null);
+ATF_TC_HEAD(c16rtomb_null, tc)
+{
+    atf_tc_set_md_var(tc, "descr",
+                      "Test c16rtomb on a null argument with a null mbstate");
+}
+/* This test checks c16rtomb behavior of resetting mbstate when provided 
+   with an uninitialized mbstate */
+ATF_TC_BODY(c16rtomb_null, tc)
+{
+    int rc;
+    mbstate_t sta;
+    mbstate_t stb;
+    char target[MB_LEN_MAX] = {0x00};
+    char16_t null_char = u'\000';
+
+    setlocale(LC_ALL, "en_US.UTF-8");
+    errno = 0;
+    rc = c16rtomb(target, null_char, &sta);
+    printf("rc=%d errno=%d strerror=%s", rc, errno, strerror(errno));
+    ATF_REQUIRE(memcmp(&sta, &stb, sizeof(mbstate_t)) == 0);
+}
+
+ATF_TC(c16rtomb_reset);
+ATF_TC_HEAD(c16rtomb_reset, tc)
+{
+    atf_tc_set_md_var(tc, "descr",
+                      "Test c16rtomb on a null argument with a null mbstate");
+}
+/* This test checks c16rtomb behavior of resetting an existing mbstate  */
+ATF_TC_BODY(c16rtomb_reset, tc)
+{
+   int rc;
+   mbstate_t sta;
+   mbstate_t stb;
+   char target[MB_LEN_MAX] = {0x00};
+   char expected[sizeof(target)] = {0xE2, 0x9A, 0xA0, 0x00};
+   char16_t warning_char = u'\u26A0'; //U+26A0 Warning Sign
+   char16_t null_char = u'\000';
+   
+   setlocale(LC_ALL, "en_US.UTF-8");
+   rc = c16rtomb(target, warning_char, &sta);
+   ATF_REQUIRE(rc == 3);
+   ATF_REQUIRE(memcmp(target, expected, MB_LEN_MAX) == 0);
+   rc = c16rtomb(target, null_char, &sta);
+   ATF_REQUIRE(rc == 0);
+   ATF_REQUIRE(memcmp(&sta, &stb, sizeof(mbstate_t)) == 0);    
+}
+
+
+
+
 ATF_TP_ADD_TCS(tp)
 {
     ATF_TP_ADD_TC(tp, c16rtomb_single);
+    ATF_TP_ADD_TC(tp, c16rtomb_null);
+
     return atf_no_error();
 }
